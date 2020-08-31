@@ -17,7 +17,7 @@ turnLCDOn:
     ld [rLCDC], a
     ret
     
-initFont:         ; wait till LCD its in VBlank to turn it off
+initFont:         ; wait till LCD is in VBlank to turn it off
                   ; All registers preserved   
     push af
     push bc
@@ -27,10 +27,10 @@ initFont:         ; wait till LCD its in VBlank to turn it off
     call turnLCDOff
     call copyFont
 
-    pop af
-    pop bc
-    pop de
     pop hl
+    pop de
+    pop bc
+    pop af
     ret
 
 copyFont:
