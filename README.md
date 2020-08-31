@@ -1,2 +1,3 @@
-# PeachyHardwareAbuse
-I make test ROMs to prove your emulators suck when I'm bored
+# Do you ever think your emulator sucks?
+I do!
+I make test ROMs to prove it does when I'm bored
