@@ -77,35 +77,10 @@ TestScreen:
     ld hl, $9801
     call StrcpyNoNull
 
-VRAMADDR SET $9841
-    ld de, MemoryText
-    ld hl, VRAMADDR
-    call StrcpyNoNull
-VRAMADDR SET VRAMADDR + $40
-    ld de, LcdText
-    ld hl, VRAMADDR
-    call StrcpyNoNull
-VRAMADDR SET VRAMADDR + $40
-    ld de, TimerText
-    ld hl, VRAMADDR
-    call StrcpyNoNull
-VRAMADDR SET VRAMADDR + $40
-    ld de, DmaText
-    ld hl, VRAMADDR
-    call StrcpyNoNull
-VRAMADDR SET VRAMADDR + $40
-    ld de, ComText
-    ld hl, VRAMADDR
-    call StrcpyNoNull
-VRAMADDR SET VRAMADDR + $40
-    ld de, KeyInputText
-    ld hl, VRAMADDR
-    call StrcpyNoNull
-VRAMADDR SET VRAMADDR + $40
-    ld de, InterruptText
-    ld hl, VRAMADDR
-    call StrcpyNoNull
-VRAMADDR SET VRAMADDR + $40
+
+    ld de, TestListText
+    ld hl, $9840
+    call StrcpyNoNullTilemapSmart
 
     ld de, PushStartText
     ld hl, $9A02
@@ -201,6 +176,10 @@ CreditsScreen:
     ld hl, $9800
     call StrcpyNoNullTilemapSmart
 
+    ld de, StartGoBackText
+    ld hl, $9A01
+    call StrcpyNoNull
+
     ld a, LCDCF_BGON | LCDCF_ON | LCDCF_BG8800 | LCDCF_BG9800
     ld [rLCDC], a
 
@@ -269,15 +248,24 @@ Font: INCBIN "GB/CTF/ags-aging-font.chr"
 SECTION "strings", ROMX
 Test: db "DMG AGING CARTRIDGE",0
 CHARMAP "→", $10
-MemoryText:    db "MEMORY....---      ",0
-LcdText:       db "LCD.......--       ",0
-TimerText:     db "TIMER.....-        ",0
-DmaText:       db "DMA.......--       ",0
-ComText:       db "COM.......-        ",0
-KeyInputText:  db "KEY INPUT.-        ",0
-InterruptText: db "INTERRUPT.-   ",0,$10,"PASS",0
+TestListText:
+db " MEMORY....---\n"
+db "\n"
+db " LCD.......--\n"
+db "\n"
+db " TIMER.....-\n"
+db "\n"
+db " DMA.......--\n"
+db "\n"
+db " COM.......-\n"
+db "\n"
+db " KEY INPUT.-\n"
+db "\n"
+db " INTERRUPT.-\n",0
 PushStartText: db "PUSH START TO GO",0
 
+; $04,$05,$06: Start button 
+StartGoBackText: db $04,$05,$06," Go Back",0
 
 CreditsText: 
 CHARMAP "─", $1C
