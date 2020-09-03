@@ -129,7 +129,7 @@ VRAMADDR SET VRAMADDR + $40
     ld a, 0
     ld [hl], a
 
-    jr z, .rehalt
+    jr z, .continue
 
     ; Invert colors for title bar
     ld a, %00011011
@@ -139,7 +139,7 @@ VRAMADDR SET VRAMADDR + $40
     dec [hl]
     ld a, [hl]
 
-    jr nz, .rehalt
+    jr nz, .continue
 
     ; if the animation timer is zero
 
@@ -159,7 +159,7 @@ VRAMADDR SET VRAMADDR + $40
     ld hl, $9A02
     call StrcpyNoNull
 
-    jr .rehalt
+    jr .continue
 
 .eraseText:
     ld d, 0
@@ -167,7 +167,79 @@ VRAMADDR SET VRAMADDR + $40
     ld hl, $9A02
     call Memset
 
+.continue:
+    call PollJoypad
+    and a, %10000000 ; Check for START
+
+    jr nz, .rehalt
+
+    call CreditsScreen
+
     jr .rehalt
+
+CreditsScreen:
+    call turnLCDOff
+
+    ; Erase tilemap
+    ld bc, 1024
+    ld hl, $9800
+    ld d, 0
+    call Memset
+    
+    ld de, CreditsText
+    ld hl, $9800
+    call StrcpyNoNullTilemapSmart
+
+    ld a, LCDCF_BGON | LCDCF_ON | LCDCF_BG8800 | LCDCF_BG9800
+    ld [rLCDC], a
+
+.rehalt
+    halt 
+
+    ; Has a Vblank interrupt occurred?
+    ld hl, VblankCounter
+    ld a, [hl]
+    ; Test if a is zero
+    or a 
+    ld a, 0
+    ld [hl], a
+
+    jr z, .rehalt
+
+    ; Invert colors for title bar
+    ld a, %00011011
+    ld [rBGP], a
+
+    jr .rehalt
+
+; Polls the joypad
+; @return A joypad status 
+; 7 - Start
+; 6 - Select
+; 5 - Button B
+; 4 - Button A
+; 3 - Down
+; 2 - Up
+; 1 - Left
+; 0 - Right
+PollJoypad:
+    ld hl, rP1
+
+    ; Put buttons in upper nibble of b
+    ld a, P1F_GET_BTN
+    ld [hl], a
+    ld a, [hl]
+    and $0F
+    ld b, a
+    swap b
+
+    ld a, P1F_GET_DPAD
+    ld [hl], a
+    ld a, [hl]
+    and $0F
+    or a, b
+
+    ret
 
 SECTION "font", ROMX
 Font: INCBIN "GB/CTF/ags-aging-font.chr"
@@ -185,14 +257,18 @@ InterruptText: db "INTERRUPT.-   ",0,$10,"PASS",0
 PushStartText: db "PUSH START TO GO",0
 
 CreditsText: 
-db "CONTACT US\n"
-db "Test Writer --------\n"
+; $1C is the horizontal line drawing character
+db " CONTACT US\n"
+db "\n"
+db $1C,"Test Writer",$1C,$1C,$1C,$1C,$1C,$1C,$1C,$1C,"\n"
+db "\n"
 db "Discord:\n"
 db " guccirodakino#1457\n"
-db "Nintendo\n" 
-db "Switch Online:\n"
-db " SW-8356-6970-6111"
-db "GUI Programmer -----\n"
+db "Nintendo Switch:\n"
+db " SW-8356-6970-6111\n"
+db "\n"
+db $1C,"GUI Programmer",$1C,$1C,$1C,$1C,$1C,"\n"
+db "\n"
 db "Discord:\n" 
 db " MLGxPwnentz#1728\n",0
 
@@ -202,3 +278,4 @@ AnimationFrame: db
 
 SECTION "hram", HRAM
 VblankCounter: db
+

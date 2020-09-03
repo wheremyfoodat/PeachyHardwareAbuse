@@ -74,13 +74,12 @@ copyStringLoop:
 ; @param HL: Destination Pointer
 Strcpy:
     ld a, [de]
-    ld [hl], a
+    ld [hl+], a
 
     or a ; Check for null terminator
     ret z
 
     inc de
-    inc hl
     
     jr Strcpy
 
@@ -93,12 +92,40 @@ StrcpyNoNull:
     or a ; Check for null terminator
     ret z
 
-    ld [hl], a
+    ld [hl+], a
 
     inc de
-    inc hl
     
     jr StrcpyNoNull
+
+; Smart copy to tilemap until null terminator is hit, excluding the null terminator
+; @param DE: Source Pointer
+; @param HL: Destination Pointer
+StrcpyNoNullTilemapSmart:
+    ld bc, 32
+    ld a, [de]
+
+    or a ; Check for null terminator
+
+    ret z
+    cp a, $A ; Detect newline character
+    jr z, .newline
+
+    ld [hl+], a
+    inc de
+
+    jr StrcpyNoNullTilemapSmart
+.newline:
+    add hl, bc
+    ld a, l
+
+    ; Reset to the left of the tilemap
+    and a, %11100000
+    ld l, a
+
+    inc de
+
+    jr StrcpyNoNullTilemapSmart
 
 ; Copies memory
 ; @param BC: Bytes to copy
