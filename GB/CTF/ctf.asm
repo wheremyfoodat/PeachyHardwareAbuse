@@ -256,19 +256,28 @@ KeyInputText:  db "KEY INPUT.O   ",$10,"PASS",0
 InterruptText: db "INTERRUPT.-   ",0,$10,"PASS",0
 PushStartText: db "PUSH START TO GO",0
 
+
 CreditsText: 
-; $1C is the horizontal line drawing character
+CHARMAP "─", $1C
+CHARMAP "┤", $0B
+CHARMAP "├", $09
+CHARMAP "┌", $1E
+CHARMAP "└", $08
+CHARMAP "┐", $1F
+CHARMAP "┘", $07
+CHARMAP "│", $1D
+
 db " CONTACT US\n"
-db "\n"
-db $1C,"Test Writer",$1C,$1C,$1C,$1C,$1C,$1C,$1C,$1C,"\n"
-db "\n"
+db "┌───────────┐\n"
+db "┤Test Writer├───────\n"
+db "└───────────┘\n"
 db "Discord:\n"
 db " guccirodakino#1457\n"
 db "Nintendo Switch:\n"
 db " SW-8356-6970-6111\n"
-db "\n"
-db $1C,"GUI Programmer",$1C,$1C,$1C,$1C,$1C,"\n"
-db "\n"
+db "┌──────────────┐\n"
+db "┤GUI Programmer├───────\n"
+db "└──────────────┘\n"
 db "Discord:\n" 
 db " MLGxPwnentz#1728\n",0
 
