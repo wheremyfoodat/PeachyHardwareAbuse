@@ -2,7 +2,9 @@ include "hardware.inc"
 include "common.asm"
 
 Section "VBLANK ISR", ROM0[$40]
-    jp Vblank
+    ld hl, VblankCounter
+    inc [hl]
+    reti
 
 Section "STAT ISR", ROM0[$48]
     ; Return colors to normal after title bar
@@ -30,12 +32,17 @@ main:
     ld hl, $C000
     call Memset
 
-    call InitTestScreen    
+    ld d, 0
+    ld bc, 32
+    ld hl, $FF80
+    call Memset
+
+    call TestScreen    
 
 .lockup:
     jr .lockup
 
-InitTestScreen:
+TestScreen:
     call turnLCDOff
 
     ld a, 30
@@ -111,9 +118,19 @@ VRAMADDR SET VRAMADDR + $40
     ld a, 8
     ld [rLYC], a
 
-    ret
+.rehalt
+    halt 
 
-Vblank:
+    ; Has a Vblank interrupt occurred?
+    ld hl, VblankCounter
+    ld a, [hl]
+    ; Test if a is zero
+    or a 
+    ld a, 0
+    ld [hl], a
+
+    jr z, .rehalt
+
     ; Invert colors for title bar
     ld a, %00011011
     ld [rBGP], a
@@ -122,7 +139,7 @@ Vblank:
     dec [hl]
     ld a, [hl]
 
-    jr nz, .exit
+    jr nz, .rehalt
 
     ; if the animation timer is zero
 
@@ -142,7 +159,7 @@ Vblank:
     ld hl, $9A02
     call StrcpyNoNull
 
-    jr .exit
+    jr .rehalt
 
 .eraseText:
     ld d, 0
@@ -150,8 +167,7 @@ Vblank:
     ld hl, $9A02
     call Memset
 
-.exit:
-    reti 
+    jr .rehalt
 
 SECTION "font", ROMX
 Font: INCBIN "GB/CTF/ags-aging-font.chr"
@@ -183,3 +199,6 @@ db " MLGxPwnentz#1728\n",0
 SECTION "wram", WRAM0
 AnimationTimer: db
 AnimationFrame: db
+
+SECTION "hram", HRAM
+VblankCounter: db
