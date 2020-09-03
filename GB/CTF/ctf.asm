@@ -36,6 +36,8 @@ main:
     di
     ld sp, $FFFC
 
+    call turnLCDOff
+
     ; Zero fill WRAM
     ld d, 0
     ld bc, $2000
@@ -46,6 +48,12 @@ main:
     ld bc, 32
     ld hl, $FF80
     call Memset
+
+    ; Copy in font
+    ld bc, 128 * 16 ; 16 bytes per tile
+    ld de, Font
+    ld hl, $9000
+    call Memcpy
 
     jp TestScreen    
 
@@ -61,22 +69,16 @@ TestScreen:
     ld a, 1
     ld [AnimationFrame], a
 
-    ld bc, $2000
-    ld hl, $8000
+    ; Erase tilemap
+    ld bc, 1024
+    ld hl, $9800
     ld d, 0
     call Memset
-
-    ; Copy in font
-    ld bc, 128 * 16 ; 16 bytes per tile
-    ld de, Font
-    ld hl, $9000
-    call Memcpy
 
     ; Copy in title
     ld de, Test
     ld hl, $9801
     call StrcpyNoNull
-
 
     ld de, TestListText
     ld hl, $9840
