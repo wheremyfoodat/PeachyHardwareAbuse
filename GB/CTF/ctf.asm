@@ -223,7 +223,7 @@ oamDMADelay1:
 Section "DMA routine 2", ROM0[$3FC0] ; checks if you've implemented bus conflicts
     ld a, $3F ; set OAM source addr to 0x3F00
     ld [$FF46], a
-    ld hl, rWX ; the CPU can't read from the main bus during a DMA.
+    ld hl, rSCX ; the CPU can't read from the main bus during a DMA.
                ; reading from rWX (which we previously set to $FF)
                ; should not return $FF, but the current value on the bus, which is, thank god, not $FF
     ld a, [hl]
