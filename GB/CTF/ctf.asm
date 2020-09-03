@@ -22,6 +22,16 @@ Entrypoint:
     ENDR
 
 SECTION "rom", ROM0[$0150]
+CheckVblankCounter: MACRO
+    ; Has a Vblank interrupt occurred?
+    ld hl, VblankCounter
+    ld a, [hl]
+    ; Test if a is zero
+    or a 
+    ld a, 0
+    ld [hl], a
+    ENDM
+
 main:
     di
     ld sp, $FFFC
@@ -37,7 +47,7 @@ main:
     ld hl, $FF80
     call Memset
 
-    call TestScreen    
+    jp TestScreen    
 
 .lockup:
     jr .lockup
@@ -120,14 +130,8 @@ VRAMADDR SET VRAMADDR + $40
 
 .rehalt
     halt 
-
-    ; Has a Vblank interrupt occurred?
-    ld hl, VblankCounter
-    ld a, [hl]
-    ; Test if a is zero
-    or a 
-    ld a, 0
-    ld [hl], a
+    
+    CheckVblankCounter
 
     jr z, .continue
 
@@ -168,12 +172,19 @@ VRAMADDR SET VRAMADDR + $40
     call Memset
 
 .continue:
+    ld a, [LastJoypad]
+    ld c, a
+    
     call PollJoypad
-    and a, %10000000 ; Check for START
 
+    and a, %10000000 ; Check for START
     jr nz, .rehalt
 
-    call CreditsScreen
+    ld a, c
+    and a, %10000000 ; Make sure it's a START rising edge
+    jr z, .rehalt
+
+    jp CreditsScreen
 
     jr .rehalt
 
@@ -196,13 +207,7 @@ CreditsScreen:
 .rehalt
     halt 
 
-    ; Has a Vblank interrupt occurred?
-    ld hl, VblankCounter
-    ld a, [hl]
-    ; Test if a is zero
-    or a 
-    ld a, 0
-    ld [hl], a
+    CheckVblankCounter
 
     jr z, .rehalt
 
@@ -210,10 +215,25 @@ CreditsScreen:
     ld a, %00011011
     ld [rBGP], a
 
+    ld a, [LastJoypad]
+    ld c, a
+    
+    call PollJoypad
+
+    and a, %10000000 ; Check for START
+    jr nz, .rehalt
+
+    ld a, c
+    and a, %10000000 ; Make sure it's a START rising edge
+    jr z, .rehalt
+
+    jp TestScreen
+
     jr .rehalt
 
 ; Polls the joypad
-; @return A joypad status 
+; @return A: joypad status 
+; @destroys A B H L
 ; 7 - Start
 ; 6 - Select
 ; 5 - Button B
@@ -239,6 +259,8 @@ PollJoypad:
     and $0F
     or a, b
 
+    ldh [LastJoypad], a
+
     ret
 
 SECTION "font", ROMX
@@ -246,13 +268,13 @@ Font: INCBIN "GB/CTF/ags-aging-font.chr"
 
 SECTION "strings", ROMX
 Test: db "DMG AGING CARTRIDGE",0
-; Character $10 is right arrow
-MemoryText:    db "MEMORY....OOO ",$10,"PASS",0
-LcdText:       db "LCD.......OO  ",$10,"PASS",0
-TimerText:     db "TIMER.....O   ",$10,"PASS",0
-DmaText:       db "DMA.......OO  ",$10,"PASS",0
-ComText:       db "COM.......O   ",$10,"PASS",0
-KeyInputText:  db "KEY INPUT.O   ",$10,"PASS",0
+CHARMAP "→", $10
+MemoryText:    db "MEMORY....---      ",0
+LcdText:       db "LCD.......--       ",0
+TimerText:     db "TIMER.....-        ",0
+DmaText:       db "DMA.......--       ",0
+ComText:       db "COM.......-        ",0
+KeyInputText:  db "KEY INPUT.-        ",0
 InterruptText: db "INTERRUPT.-   ",0,$10,"PASS",0
 PushStartText: db "PUSH START TO GO",0
 
@@ -287,4 +309,5 @@ AnimationFrame: db
 
 SECTION "hram", HRAM
 VblankCounter: db
+LastJoypad: db
 
