@@ -2,14 +2,14 @@ include "hardware.inc"
 include "common.asm"
 
 Section "VBLANK ISR", ROM0[$40]
-    ld hl, VblankCounter
-    inc [hl]
+    ld a, %00000001
     reti
 
 Section "STAT ISR", ROM0[$48]
     ; Return colors to normal after title bar
     ld a, %11100100
     ld [rBGP], a
+    ld a, %00000010
     reti
 
 SECTION "start", ROM0[$0100]
@@ -22,16 +22,6 @@ Entrypoint:
     ENDR
 
 SECTION "rom", ROM0[$0150]
-CheckVblankCounter: MACRO
-    ; Has a Vblank interrupt occurred?
-    ld hl, VblankCounter
-    ld a, [hl]
-    ; Test if a is zero
-    or a 
-    ld a, 0
-    ld [hl], a
-    ENDM
-
 main:
     di
     ld sp, $FFFC
@@ -108,7 +98,9 @@ TestScreen:
 .rehalt
     halt 
     
-    CheckVblankCounter
+    ; Check unHALTing source
+    and a, %00000001
+    jr z, .rehalt
 
     jr z, .continue
 
@@ -188,8 +180,8 @@ CreditsScreen:
 .rehalt
     halt 
 
-    CheckVblankCounter
-
+    ; Check unHALTing source
+    and a, %00000001
     jr z, .rehalt
 
     ; Invert colors for title bar
@@ -298,6 +290,5 @@ AnimationTimer: db
 AnimationFrame: db
 
 SECTION "hram", HRAM
-VblankCounter: db
 LastJoypad: db
 
