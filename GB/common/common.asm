@@ -3,6 +3,20 @@ include "font.asm"
 
 SECTION "helpers", ROMX, BANK[1]
 
+SaveRegisters: MACRO
+               push af
+               push bc
+               push de
+               push hl
+               ENDM
+
+RestoreRegisters: MACRO
+                  pop hl
+                  pop de
+                  pop bc
+                  pop af
+                  ENDM
+
 turnLCDOff:
     ld a, [rLY]
     cp $90 ; Check if the LCD is past VBlank
@@ -19,18 +33,10 @@ turnLCDOn:
     
 initFont:         ; wait till LCD is in VBlank to turn it off
                   ; All registers preserved   
-    push af
-    push bc
-    push de
-    push hl
-
+    SaveRegisters
     call turnLCDOff
     call copyFont
-
-    pop hl
-    pop de
-    pop bc
-    pop af
+    RestoreRegisters
     ret
 
 copyFont:
@@ -57,7 +63,8 @@ copyStringLoop:
     ld [hl+], a
     inc de
     and a ; Check if the byte we just copied is zero
-    jr nz, copyStringLoop ; Continue if it's not
+    jr nz, copyStringLoop ; Continue if it is not
 
     pop af
     ret
+
