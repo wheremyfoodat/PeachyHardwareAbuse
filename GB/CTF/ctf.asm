@@ -51,18 +51,17 @@ round3:               ; make sure DMA is not instant
     ld hl, $FF80
     ld bc, $3FA0
 
-copyOAMDMARoutine:    
+copyOAMDMARoutine1:    
     ld a, [bc]
     ld [hl+], a
     inc bc
     cp a, $C9
-    jp nz, copyOAMDMARoutine
+    jp nz, copyOAMDMARoutine1
 
     ld hl, $FE9F
     xor a
     ld [hl], a ; store 0 into last OAM byte
 
-    ld a, $3F ; set OAM source addr to 0x3F00
     call $FF80 ; go to OAM handling routine
 
 round4:           ; How is your serial port doing?
@@ -130,7 +129,7 @@ round7:         ; Make sure the PPU is unable to lock OAM on the first scanline 
     jp z, lock
     call turnLCDOff
 
-;round8:       ; Joypad interrupt!
+round8:       ; Joypad interrupt!
     ld a, %11011111
     ld [rP1], a
     ld a, %10000
@@ -147,6 +146,20 @@ pollJoypadInterrupt:
     cp a, d
     jp nz, pollJoypadInterrupt
     call turnLCDOff
+
+round9:          ; DMA bus conflicts!
+    ld hl, $FF80
+    ld bc, $3FC0
+
+copyOAMDMARoutine2:    
+    ld a, [bc]
+    ld [hl+], a
+    inc bc
+    cp a, $C9
+    jp nz, copyOAMDMARoutine2
+
+    call $FF80
+
 
 ; print results
     ld hl, $9800
@@ -193,15 +206,33 @@ SECTION "OAM info", ROM0[$3F00]
     ENDR
 
 SECTION "DMA routine 1", ROM0[$3FA0] ; the DMA routine that checks if your DMA is instant
+    ld a, $3F ; set OAM source addr to 0x3F00
     ld [$FF46], a
-    ld hl, $FE9F
     ld a, [hl]
     cp a, $69
     JP Z, lock
 
     ld a, $28
 
-oamDMADelay:
+oamDMADelay1:
     dec a
-    jr nz, oamDMADelay
+    jr nz, oamDMADelay1
+    ret
+
+
+Section "DMA routine 2", ROM0[$3FC0] ; checks if you've implemented bus conflicts
+    ld a, $3F ; set OAM source addr to 0x3F00
+    ld [$FF46], a
+    ld hl, rWX ; the CPU can't read from the main bus during a DMA.
+               ; reading from rWX (which we previously set to $FF)
+               ; should not return $FF, but the current value on the bus, which is, thank god, not $FF
+    ld a, [hl]
+    cp a, $FF 
+    jp Z, lock
+
+    ld a, $28
+
+oamDMADelay2:
+    dec a
+    jr nz, oamDMADelay2
     ret
