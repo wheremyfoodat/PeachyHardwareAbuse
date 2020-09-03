@@ -20,7 +20,7 @@ RestoreRegisters: MACRO
 turnLCDOff:
     ld a, [rLY]
     cp $90 ; Check if the LCD is past VBlank
-    jr nc, turnLCDOff
+    jr nz, turnLCDOff
 
     xor a
     ld [rLCDC], a
@@ -68,3 +68,71 @@ copyStringLoop:
     pop af
     ret
 
+
+; Copies until null terminator is hit, including the null terminator
+; @param DE: Source Pointer
+; @param HL: Destination Pointer
+Strcpy:
+    ld a, [de]
+    ld [hl], a
+
+    or a ; Check for null terminator
+    ret z
+
+    inc de
+    inc hl
+    
+    jr Strcpy
+
+; Copies until null terminator is hit, excluding the null terminator
+; @param DE: Source Pointer
+; @param HL: Destination Pointer
+StrcpyNoNull:
+    ld a, [de]
+
+    or a ; Check for null terminator
+    ret z
+
+    ld [hl], a
+
+    inc de
+    inc hl
+    
+    jr StrcpyNoNull
+
+; Copies memory
+; @param BC: Bytes to copy
+; @param DE: Source Pointer
+; @param HL: Destination Pointer
+Memcpy:
+    ld a, [de]
+    ld [hl+], a
+
+    inc de
+    dec bc
+
+    ld a, b
+    or a
+    jr nz, Memcpy
+    ld a, c
+    or a
+    jr nz, Memcpy
+    ret
+
+; Sets a block of memory to a value
+; BC: Bytes to copy
+; HL: Pointer to destination
+; D: Byte to set with
+Memset:
+    ld a, d
+    ld [hl+], a
+
+    dec bc
+
+    ld a, b
+    or a
+    jr nz, Memset
+    ld a, c
+    or a
+    jr nz, Memset
+    ret
