@@ -160,6 +160,21 @@ copyOAMDMARoutine2:
 
     call $FF80
 
+round10:      ; POP timing (PUSH timing is pretty much the same thing so I don't test it out of laziness)
+    ld sp, rDIV
+    xor a
+    ld [rDIV], a
+    
+    REPT 62  ; 62 NOPs
+        db 0
+    ENDR
+
+    pop bc
+
+    ld sp, $FFFC
+    ld a, c
+    cp $1
+    jp nz, lock
 
 ; print results
     ld hl, $9800
@@ -221,13 +236,12 @@ oamDMADelay1:
 
 
 Section "DMA routine 2", ROM0[$3FC0] ; checks if you've implemented bus conflicts
+    ld hl, $C000
     ld a, $3F ; set OAM source addr to 0x3F00
+    ld [hl], a
     ld [$FF46], a
-    ld hl, rSCX ; the CPU can't read from the main bus during a DMA.
-               ; reading from rSCX (which we previously set to $FF)
-               ; should not return $FF, but the current value on the bus, which is, thank god, not $FF
     ld a, [hl]
-    cp a, $FF 
+    cp a, $3F ; this should cause a bus conflict and make it read the value on the bus instead of $3F
     jp Z, lock
 
     ld a, $28
