@@ -176,6 +176,42 @@ round10:      ; POP timing (PUSH timing is pretty much the same thing so I don't
     cp $1
     jp nz, lock
 
+round11:     ; HALT bug
+    di
+    xor a
+    ld [rTIMA], a
+    ld [rIF], a
+
+    ld a, %100
+    ld [rIE], a
+    inc a
+    ld [rTAC], a
+
+    db $76  ; opcode for HALT. The assembler automatically adds a NOP after the halt otherwise
+    inc a 
+    cp a, %110 
+    jp nz, lock
+
+    REPT 60  ; 60 NOPs
+        db 0
+    ENDR
+
+    db $76  ; opcode for HALT. The assembler automatically adds a NOP after the halt otherwise
+    inc a   ; this should trigger the halt bug. therefore this instruction should be executed twice
+    cp a, %1000 
+    jp nz, lock
+
+round12:     ; EI/DI
+    xor a
+    ld d, a
+
+    ei ; Timer IRQs have been enabled and requested since round11 
+    di
+
+    ld a, d
+    cp $69
+    jp z, lock
+
 ; print results
     ld hl, $9800
     call Success
@@ -207,6 +243,10 @@ ButtonStr:
 SECTION "STAT IRQ vector", ROM0[$048]
     ret
 
+SECTION "Timer IRQ vector", ROM0[$050]
+    ld d, $69
+    ret
+
 SECTION "Serial IRQ vector", ROM0[$058]
     inc d
     ret
@@ -225,7 +265,7 @@ SECTION "DMA routine 1", ROM0[$3FA0] ; the DMA routine that checks if your DMA i
     ld [$FF46], a
     ld a, [hl]
     cp a, $69
-    JP Z, lock
+    jp z, lock
 
     ld a, $28
 
@@ -242,11 +282,24 @@ Section "DMA routine 2", ROM0[$3FC0] ; checks if you've implemented bus conflict
     ld [$FF46], a
     ld a, [hl]
     cp a, $3F ; this should cause a bus conflict and make it read the value on the bus instead of $3F
-    jp Z, lock
+    push af
+    pop bc ; store current F register in C. We can't lock quite yet cause doing so would cause a bus conflict
+
+    ld a, [rSCX] ; This is an MMIO address, so accessing it shouldn't cause a bus conflict
+    cp a, $FF 
+    ;jp nz, lock
+    push af
+    pop de  ; store current F register in E. We can't lock quite yet cause doing so would cause a bus conflict
 
     ld a, $28
 
 oamDMADelay2:
     dec a
     jr nz, oamDMADelay2
+
+    bit 7, c
+    jp nz, lock
+
+    bit 7, e
+    jp z, lock
     ret
