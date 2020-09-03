@@ -18,6 +18,11 @@ RestoreRegisters: MACRO
                   ENDM
 
 turnLCDOff:
+    ; If the LCDC is already disabled, return.
+    ld a, [rLCDC]
+    and a, %00000001
+    ret z
+
     ld a, [rLY]
     cp $90 ; Check if the LCD is past VBlank
     jr nz, turnLCDOff
