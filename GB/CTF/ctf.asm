@@ -241,7 +241,6 @@ Font: INCBIN "GB/CTF/ags-aging-font.chr"
 
 SECTION "strings", ROMX
 Test: db "DMG AGING CARTRIDGE",0
-CHARMAP "→", $10
 TestListText:
 db " MEMORY....---\n"
 db "\n"
@@ -257,6 +256,10 @@ db " KEY INPUT.-\n"
 db "\n"
 db " INTERRUPT.-\n",0
 PushStartText: db "PUSH START TO GO",0
+
+CHARMAP "→", $10
+PassText: db "→PASS",0
+FailText: db "→FAIL",0 
 
 ; $04,$05,$06: Start button 
 StartGoBackText: db $04,$05,$06," Go Back",0

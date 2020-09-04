@@ -108,6 +108,7 @@ StrcpyNoNull:
 ; @param HL: Destination Pointer
 StrcpyNoNullTilemapSmart:
     ld bc, 32
+.loop:
     ld a, [de]
 
     or a ; Check for null terminator
@@ -119,7 +120,7 @@ StrcpyNoNullTilemapSmart:
     ld [hl+], a
     inc de
 
-    jr StrcpyNoNullTilemapSmart
+    jr .loop
 .newline:
     add hl, bc
     ld a, l
@@ -130,7 +131,7 @@ StrcpyNoNullTilemapSmart:
 
     inc de
 
-    jr StrcpyNoNullTilemapSmart
+    jr .loop
 
 ; Copies memory
 ; @param BC: Bytes to copy
