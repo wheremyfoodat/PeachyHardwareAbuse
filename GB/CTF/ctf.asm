@@ -240,12 +240,56 @@ PollJoypad:
     ret
 
 RunTests:
+    xor a
+    ld [CurrentTestNumber], a
+
+.nextTest:
+    ld a, [CurrentTestNumber]
+    ld c, a
+    call DispatchTestNumber
+    ; Test returns success value in a, back that up.
+    ld d, a
+    ld a, [CurrentTestNumber]
+    ld c, a
+    ld a, d
+    call SetTestNumberSuccess
+    
+    ld hl, CurrentTestNumber
+    ld a, [hl]
+    inc a
+    ld [hl], a
+
+    cp TestCount
+    jr nz, .nextTest
+
     ret
+
+; Dispatches a test.
+; Ends with JP HL, test is required to execute RET
+; @param c - Test number 0-127
+; @returns a - 1 for success, 0 for failure
+; @trashes c
+DispatchTestNumber:
+    ld b, 0
+
+    ; Puts the VRAM address in BC
+    sla c
+    ld hl, TestTable
+    add hl, bc
+    ld a, [hl+]
+    ld c, a
+    ld a, [hl+]
+    ld b, a
+
+    ld h, b
+    ld l, c
+
+    jp hl
 
 ; Sets a test success value on the screen
 ; @param a - 1 for success, 0 for failure
-; @param c - Test number
-SetTestSuccess:
+; @param c - Test number 0-127
+SetTestNumberSuccess:
     ld d, a
 
     ld b, 0
@@ -264,6 +308,8 @@ SetTestSuccess:
     cp $90 ; Check if the LCD is past VBlank
     jr nz, .loop
 
+    ld a, d
+
     ; Check if A is 0
     and a
     jp z, .zero
@@ -276,31 +322,31 @@ SetTestSuccess:
     ld [bc], a
     ret
 
+
+TestCount EQU 11
 TestTable:
-    dw round1  ; MEMORY
-    dw round2  ; MEMORY
-    dw round3  ; DMA
-    dw round4  ; COM
-    dw round5  ; MEMORY
-    dw round6  ; LCD
-    dw round7  ; LCD
-    dw round8  ; KEY INPUT
-    dw round9  ; DMA
-    dw round10 ; MEMORY
-    dw round11 ; INTERRUPT
-    dw round12 ; INTERRUPT
+    dw round1  ; 0 - MEMORY
+    dw round2  ; 1 - MEMORY
+    dw round5  ; 2 - MEMORY
+    dw round10 ; 3 - MEMORY
+    dw round6  ; 4 - LCD
+    dw round7  ; 5 - LCD
+    dw round3  ; 6 - DMA
+    dw round9  ; 7 - DMA
+    dw round4  ; 8 - COM
+    dw round11 ; 9 - INTERRUPT
+    dw round12 ; A - INTERRUPT
 
 SymbolVramTable: 
     dw $984B ; dw round1 ; MEMORY
     dw $984C ; dw round2 ; MEMORY
-    dw $980B ; dw round3 ; DMA
-    dw $994B ; dw round4 ; COM
     dw $984D ; dw round5 ; MEMORY
+    dw $984E ; dw round10 ; MEMORY
     dw $988B ; dw round6 ; LCD
     dw $988C ; dw round7 ; LCD
-    dw $998B ; dw round8 ; KEY INPUT
-    dw $980C ; dw round9 ; DMA
-    dw $984E ; dw round10 ; MEMORY
+    dw $990B ; dw round3 ; DMA
+    dw $990C ; dw round9 ; DMA
+    dw $994B ; dw round4 ; COM
     dw $99CB ; dw round11 ; INTERRUPT
     dw $99CC ; dw round12 ; INTERRUPT
 
@@ -320,7 +366,7 @@ db " DMA.......--\n"
 db "\n"
 db " COM.......-\n"
 db "\n"
-db " KEY INPUT.-\n"
+db " KEY INPUT.\n"
 db "\n"
 db " INTERRUPT.--\n",0
 PushStartText: db "PUSH START TO GO",0
@@ -343,23 +389,23 @@ CHARMAP "┘", $07
 CHARMAP "│", $1D
 
 db " CONTACT US\n"
+db "┌──────────────┐\n"
+db "┤GUI Programmer├───────\n"
+db "└──────────────┘\n"
+db "Discord:\n" 
+db " MLGxPwnentz#1728\n"
 db "┌───────────┐\n"
 db "┤Test Writer├───────\n"
 db "└───────────┘\n"
 db "Discord:\n"
 db " guccirodakino#1457\n"
 db "Nintendo Switch:\n"
-db " SW-8356-6970-6111\n"
-db "┌──────────────┐\n"
-db "┤GUI Programmer├───────\n"
-db "└──────────────┘\n"
-db "Discord:\n" 
-db " MLGxPwnentz#1728\n",0
+db " SW-8356-6970-6111\n",0
 
 SECTION "wram", WRAM0
 AnimationTimer: db
 AnimationFrame: db
-CurrentTest: db
+CurrentTestNumber: db
 
 SECTION "hram", HRAM
 LastJoypad: db
