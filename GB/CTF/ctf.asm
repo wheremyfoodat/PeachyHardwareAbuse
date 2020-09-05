@@ -1,5 +1,6 @@
 include "hardware.inc"
 include "common.asm"
+include "GB/CTF/tests.asm"
 
 Section "VBLANK ISR", ROM0[$40]
     ld a, %00000001
@@ -94,6 +95,8 @@ TestScreen:
     ; Use LY=LYC STAT interrupt for resetting colors after the title bar
     ld a, 8
     ld [rLYC], a
+
+    call RunTests
 
 .rehalt
     halt 
@@ -236,17 +239,82 @@ PollJoypad:
 
     ret
 
+RunTests:
+    ret
+
+; Sets a test success value on the screen
+; @param a - 1 for success, 0 for failure
+; @param c - Test number
+SetTestSuccess:
+    ld d, a
+
+    ld b, 0
+
+    ; Puts the VRAM address in BC
+    sla c
+    ld hl, SymbolVramTable
+    add hl, bc
+    ld a, [hl+]
+    ld c, a
+    ld a, [hl+]
+    ld b, a
+
+.loop:
+    ld a, [rLY]
+    cp $90 ; Check if the LCD is past VBlank
+    jr nz, .loop
+
+    ; Check if A is 0
+    and a
+    jp z, .zero
+
+    ld a, "O"
+    ld [bc], a
+    ret
+.zero:
+    ld a, "X"
+    ld [bc], a
+    ret
+
+TestTable:
+    dw round1  ; MEMORY
+    dw round2  ; MEMORY
+    dw round3  ; DMA
+    dw round4  ; COM
+    dw round5  ; MEMORY
+    dw round6  ; LCD
+    dw round7  ; LCD
+    dw round8  ; KEY INPUT
+    dw round9  ; DMA
+    dw round10 ; MEMORY
+    dw round11 ; INTERRUPT
+    dw round12 ; INTERRUPT
+
+SymbolVramTable: 
+    dw $984B ; dw round1 ; MEMORY
+    dw $984C ; dw round2 ; MEMORY
+    dw $980B ; dw round3 ; DMA
+    dw $994B ; dw round4 ; COM
+    dw $984D ; dw round5 ; MEMORY
+    dw $988B ; dw round6 ; LCD
+    dw $988C ; dw round7 ; LCD
+    dw $998B ; dw round8 ; KEY INPUT
+    dw $980C ; dw round9 ; DMA
+    dw $984E ; dw round10 ; MEMORY
+    dw $99CB ; dw round11 ; INTERRUPT
+    dw $99CC ; dw round12 ; INTERRUPT
+
 SECTION "font", ROMX
 Font: INCBIN "GB/CTF/ags-aging-font.chr"
 
-SECTION "strings", ROMX
+SECTION "UIStrings", ROMX
 Test: db "DMG AGING CARTRIDGE",0
 TestListText:
-db " MEMORY....---\n"
+db " MEMORY....----\n"
 db "\n"
 db " LCD.......--\n"
 db "\n"
-db " TIMER.....-\n"
+db " TIMER.....\n"
 db "\n"
 db " DMA.......--\n"
 db "\n"
@@ -254,7 +322,7 @@ db " COM.......-\n"
 db "\n"
 db " KEY INPUT.-\n"
 db "\n"
-db " INTERRUPT.-\n",0
+db " INTERRUPT.--\n",0
 PushStartText: db "PUSH START TO GO",0
 
 CHARMAP "→", $10
@@ -291,6 +359,7 @@ db " MLGxPwnentz#1728\n",0
 SECTION "wram", WRAM0
 AnimationTimer: db
 AnimationFrame: db
+CurrentTest: db
 
 SECTION "hram", HRAM
 LastJoypad: db
