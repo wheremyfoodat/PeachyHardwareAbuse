@@ -70,6 +70,7 @@ round4:           ; How is your serial port doing?
     ld [rSB], a ; set data to be transferred (0)
     ld a, %00000 ; Enable no interrupts, we're just gonna check IF
     ld [rIE],   a ; final blow: Enable serial IRQ
+    ld [rIF],   a
     ei            ; This is getting fucking mean
 
     ld a, %10000001
@@ -77,7 +78,7 @@ round4:           ; How is your serial port doing?
 
 .pollSB:
 
-    ld a, 128
+    ld a, 32
 .wait ; Each iteration of this loop takes 4M
     dec a        ; 1M
     jr nz, .wait ; 3M with branch
@@ -85,13 +86,17 @@ round4:           ; How is your serial port doing?
     ld a, [rSB]
     cp a, $0
     jp z, .restoreIeAndFail
-    jp .restoreIeAndSucceed
     
 .checkSerialIRQ:
-    ld a, d
-    cp a, $1
 
-    jp nz, .restoreIeAndFail
+    ld a, 255
+.waitAgain ; Each iteration of this loop takes 4M
+    dec a        ; 1M
+    jr nz, .waitAgain ; 3M with branch
+
+    ld hl, rIF
+    bit 3, [hl]
+    jp z, .restoreIeAndFail
 
 .restoreIeAndSucceed
     ld a, [IEBackup]
@@ -362,7 +367,7 @@ SECTION "Joypad IRQ vector", ROM0[$060]
 
 SECTION "OAM info", ROM0[$3F00]
     REPT $3F9F - $3F00
-        db 69
+        db $69
     ENDR
 
 SECTION "DMA routine 1", ROM0[$3FA0] 
@@ -390,11 +395,14 @@ OAMDMARoutine2:
     ld a, $3F ; set OAM source addr to 0x3F00
     ld [hl], a
     ld [$FF46], a
+    nop
     ld a, [hl] ; this should cause a bus conflict and make it read the value on the bus instead of $3F
     cp a, $3F
     jr z, .endFail
-    cp a, $69 ; also check the bus conflict value to be correct
-    jr nz, .endFail
+    ; cp a, $69 ; also check the bus conflict value to be correct
+    ; jr nz, .endFail
+
+    jr .endSucc
 
     ld a, [rNR11] ; This is an MMIO address, so accessing it shouldn't cause a bus conflict
     cp a, $FF
