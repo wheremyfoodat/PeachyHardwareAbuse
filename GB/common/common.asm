@@ -20,7 +20,7 @@ RestoreRegisters: MACRO
 turnLCDOff:
     ; If the LCDC is already disabled, return.
     ld a, [rLCDC]
-    and a, %00000001
+    and a, %10000000
     ret z
 
     ld a, [rLY]
