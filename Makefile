@@ -13,7 +13,7 @@ ags-aging-font.chr:
 %.o: %.asm ags-aging-font.chr
 	$(ASM) -o $@ $< 
 
-$(gb): %.gb: %.o .FORCE
+%.gb: %.o .FORCE
 	rgblink -o $@ $<
 	rgbfix -v -p 0 $@
 
