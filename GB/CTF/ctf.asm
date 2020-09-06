@@ -1,5 +1,17 @@
 include "hardware.inc"
 include "common.asm"
+include "GB/CTF/tests.asm"
+
+Section "VBLANK ISR", ROM0[$40]
+    ld a, %00000001
+    reti
+
+Section "STAT ISR", ROM0[$48]
+    ; Return colors to normal after title bar
+    ld a, %11100100
+    ld [rBGP], a
+    ld a, %00000010
+    reti
 
 SECTION "start", ROM0[$0100]
 Entrypoint:
@@ -15,291 +27,388 @@ main:
     di
     ld sp, $FFFC
 
-    ; init video (enable LCD later)
-    call initFont    
+    call turnLCDOff
+
+    ; Zero fill WRAM
+    ld d, 0
+    ld bc, $2000
+    ld hl, $C000
+    call Memset
+
+    ld d, 0
+    ld bc, 32
+    ld hl, $FF80
+    call Memset
+
+    ; Copy in font
+    ld bc, 128 * 16 ; 16 bytes per tile
+    ld de, Font
+    ld hl, $9000
+    call Memcpy
+
+    jp TestScreen    
+
+.lockup:
+    jr .lockup
+
+TestScreen:
+    call turnLCDOff
+
+    ld a, 30
+    ld [AnimationTimer], a
+
+    ld a, 1
+    ld [AnimationFrame], a
+
+    ; Erase tilemap
+    ld bc, 1024
+    ld hl, $9800
+    ld d, 0
+    call Memset
+
+    ; Copy in title
+    ld de, Test
+    ld hl, $9801
+    call StrcpyNoNull
+
+    ld de, TestListText
+    ld hl, $9840
+    call StrcpyNoNullTilemapSmart
+
+    ld de, PushStartText
+    ld hl, $9A02
+    call StrcpyNoNull
+
     ld a, %11100100
     ld [rBGP], a
-
-    ld a, $FF ; Set SCX/SCY to 255 to torture people with bad PPUs
-    ld [rSCY], a
-    ld [rSCX], a
-
-    ld hl, $9C00
-    ld a, $C9   ; inject RET into VRAM for round 6
-    ld [hl], a
-    ld hl, $FE00
-    ld [hl], a ; Write 0xC9 into OAM for round 7
-
-
-round1:
-    ld [rTMA], a
-    call rTMA
-
-round2:
-    ld hl, $C000
-    ld a, $76
-    ld [hl+], a ; Inject HALT, HALT
-    ld [hl+], a
-
-    ld a, $C9
-    ld hl, $E000 ; check echo RAM works
-    ld [hl], a
-    call $C000
-
-
-round3:               ; make sure DMA is not instant
-    ld hl, $FF80
-    ld bc, $3FA0
-
-copyOAMDMARoutine1:    
-    ld a, [bc]
-    ld [hl+], a
-    inc bc
-    cp a, $C9
-    jp nz, copyOAMDMARoutine1
-
-    ld hl, $FE9F
-    xor a
-    ld [hl], a ; store 0 into last OAM byte
-
-    call $FF80 ; go to OAM handling routine
-
-round4:           ; How is your serial port doing?
-    xor a
-    ld d, a
-    ld [rSB], a ; set data to be transferred (0)
-    ld a, %01000
-    ld [rDIV],  a ; confuse them by writing to random registers
-    ld [rTIMA], a
-    ld [rIE],   a ; final blow: Enable serial IRQ
-    ei            ; This is getting fucking mean
-
-    ld a, %10000001
-    ld [rSC],   a ; enable transfer with internal clock
-
-pollSB:
-    ld a, [rSB]
-    cp a, $3F
-    jp nz, pollSB
-
-checkSerialIRQ:
-    push de ; gotta obfuscate ld a, d
-    pop af
-    or a, $80 ; this OR is useless but nobody knows
-    cp a, $81
-    jp nz, checkSerialIRQ
-
-    ld a, [rIF] ; triple check that the serial IRQ was fired
-    bit 3, a
-    jp nz, lock
-
-round5:
-    ld hl, $0000
     
-writeToROM:          ; try to catch MBC bugs
-    daa              ; This daa is useless but it makes the program harder to understand
-    ld [hl+], a
-    bit 7, h
-    jp z, writeToROM
+    ld a, LCDCF_BGON | LCDCF_ON | LCDCF_BG8800 | LCDCF_BG9800
+    ld [rLCDC], a
 
-round6:               ; checks VRAM locking works
-    call turnLCDOn
-
-waitForLCDTransfer:
-    ld a, [rSTAT]
-    and a, $3
-    cp a, $3
-    jp nz, waitForLCDTransfer
-
-    ld hl, $9C00
-    ld a, $76     ; Attempt to inject HALT, HALT into VRAM and jump into it
-                  ; this should do nothing cause VRAM will be locked when this ISR occurs
-    ld [hl+], a
-    ld [hl+], a
-    call $9C00
-
-    call turnLCDOff
-
-round7:         ; Make sure the PPU is unable to lock OAM on the first scanline after being enabled
-    ld hl, $FE00
-    call turnLCDOn
-    ld a, [hl]
-    cp a, $FF    ; The PPU fails to lock OAM in the first scanline after enabling the turnLCDOn
-                 ; hence this read should read the 0xC9 we injected at the start
-    jp z, lock
-    call turnLCDOff
-
-round8:       ; Joypad interrupt!
-    ld a, %11011111
-    ld [rP1], a
-    ld a, %10000
-    ld [rIE], a
     ei
+    ld a, IEF_LCDC | IEF_VBLANK
+    ld [rIE], a
 
-    ld de, ButtonStr
-    ld hl, $9800
-    call copyString
-    call turnLCDOn
-    ld a, $FE
+    ld a, STATF_LYC
+    ld [rSTAT], a
 
-pollJoypadInterrupt:
-    cp a, d
-    jp nz, pollJoypadInterrupt
+    ; Use LY=LYC STAT interrupt for resetting colors after the title bar
+    ld a, 8
+    ld [rLYC], a
+
+    call RunTests
+
+.rehalt
+    halt 
+    
+    ; Check unHALTing source
+    and a, %00000001
+    jr z, .rehalt
+
+    jr z, .continue
+
+    ; Invert colors for title bar
+    ld a, %00011011
+    ld [rBGP], a
+
+    ld hl, AnimationTimer
+    dec [hl]
+    ld a, [hl]
+
+    jr nz, .continue
+
+    ; if the animation timer is zero
+
+    ld a, 30
+    ld [hl], a
+
+    ld hl, AnimationFrame
+    ld a, [hl]
+    xor a, 1 ; Toggle bit 0
+    ld [hl], a
+
+    jr z, .eraseText
+
+    ; Copy text
+
+    ld de, PushStartText
+    ld hl, $9A02
+    call StrcpyNoNull
+
+    jr .continue
+
+.eraseText:
+    ld d, 0
+    ld bc, 16
+    ld hl, $9A02
+    call Memset
+
+.continue:
+    ld a, [LastJoypad]
+    ld c, a
+    
+    call PollJoypad
+
+    and a, %10000000 ; Check for START
+    jr nz, .rehalt
+
+    ld a, c
+    and a, %10000000 ; Make sure it's a START rising edge
+    jr z, .rehalt
+
+    jp CreditsScreen
+
+    jr .rehalt
+
+CreditsScreen:
     call turnLCDOff
 
-round9:          ; DMA bus conflicts!
-    ld hl, $FF80
-    ld bc, $3FC0
-
-copyOAMDMARoutine2:    
-    ld a, [bc]
-    ld [hl+], a
-    inc bc
-    cp a, $C9
-    jp nz, copyOAMDMARoutine2
-
-    call $FF80
-
-round10:      ; POP timing (PUSH timing is pretty much the same thing so I don't test it out of laziness)
-    ld sp, rDIV
-    xor a
-    ld [rDIV], a
+    ; Erase tilemap
+    ld bc, 1024
+    ld hl, $9800
+    ld d, 0
+    call Memset
     
-    REPT 62  ; 62 NOPs
-        db 0
-    ENDR
+    ld de, CreditsText
+    ld hl, $9800
+    call StrcpyNoNullTilemapSmart
 
-    pop bc
+    ld de, StartGoBackText
+    ld hl, $9A01
+    call StrcpyNoNull
 
-    ld sp, $FFFC
+    ld a, LCDCF_BGON | LCDCF_ON | LCDCF_BG8800 | LCDCF_BG9800
+    ld [rLCDC], a
+
+.rehalt
+    halt 
+
+    ; Check unHALTing source
+    and a, %00000001
+    jr z, .rehalt
+
+    ; Invert colors for title bar
+    ld a, %00011011
+    ld [rBGP], a
+
+    ld a, [LastJoypad]
+    ld c, a
+    
+    call PollJoypad
+
+    and a, %10000000 ; Check for START
+    jr nz, .rehalt
+
     ld a, c
-    cp $1
-    jp nz, lock
+    and a, %10000000 ; Make sure it's a START rising edge
+    jr z, .rehalt
 
-round11:     ; HALT bug
-    di
+    jp TestScreen
+
+    jr .rehalt
+
+; Polls the joypad
+; @return A: joypad status 
+; @destroys A B H L
+; 7 - Start
+; 6 - Select
+; 5 - Button B
+; 4 - Button A
+; 3 - Down
+; 2 - Up
+; 1 - Left
+; 0 - Right
+PollJoypad:
+    ld hl, rP1
+
+    ; Put buttons in upper nibble of b
+    ld a, P1F_GET_BTN
+    ld [hl], a
+    ld a, [hl]
+    and $0F
+    ld b, a
+    swap b
+
+    ld a, P1F_GET_DPAD
+    ld [hl], a
+    ld a, [hl]
+    and $0F
+    or a, b
+
+    ldh [LastJoypad], a
+
+    ret
+
+RunTests:
     xor a
-    ld [rTIMA], a
-    ld [rIF], a
+    ld [CurrentTestNumber], a
 
-    ld a, %100
-    ld [rIE], a
+.nextTest:
+    ld a, [CurrentTestNumber]
+    ld c, a
+    call DispatchTestNumber
+    ; Test returns success value in a, back that up.
+    ld d, a
+    ld a, [CurrentTestNumber]
+    ld c, a
+    ld a, d
+    call SetTestNumberSuccess
+    
+    ld hl, CurrentTestNumber
+    ld a, [hl]
     inc a
-    ld [rTAC], a
+    ld [hl], a
 
-    db $76  ; opcode for HALT. The assembler automatically adds a NOP after the halt otherwise
-    inc a 
-    cp a, %110 
-    jp nz, lock
+    cp TestCount
+    jr nz, .nextTest
 
-    REPT 60  ; 60 NOPs
-        db 0
-    ENDR
+    ret
 
-    db $76  ; opcode for HALT. The assembler automatically adds a NOP after the halt otherwise
-    inc a   ; this should trigger the halt bug. therefore this instruction should be executed twice
-    cp a, %1000 
-    jp nz, lock
+; Dispatches a test.
+; Ends with JP HL, test is required to execute RET
+; @param c - Test number 0-127
+; @returns a - 1 for success, 0 for failure
+; @trashes c
+DispatchTestNumber:
+    ld b, 0
 
-round12:     ; EI/DI
-    xor a
+    ; Puts the VRAM address in BC
+    sla c
+    ld hl, TestTable
+    add hl, bc
+    ld a, [hl+]
+    ld c, a
+    ld a, [hl+]
+    ld b, a
+
+    ld h, b
+    ld l, c
+
+    jp hl
+
+; Sets a test success value on the screen
+; @param a - 1 for success, 0 for failure
+; @param c - Test number 0-127
+SetTestNumberSuccess:
     ld d, a
 
-    ei ; Timer IRQs have been enabled and requested since round11 
-    di
+    ld b, 0
+
+    ; Puts the VRAM address in BC
+    sla c
+    ld hl, SymbolVramTable
+    add hl, bc
+    ld a, [hl+]
+    ld c, a
+    ld a, [hl+]
+    ld b, a
+
+.loop:
+    ld a, [rLY]
+    cp $90 ; Check if the LCD is past VBlank
+    jr nz, .loop
 
     ld a, d
-    cp $69
-    jp z, lock
 
-; print results
-    ld hl, $9800
-    call Success
-    call copyString
+    ; Check if A is 0
+    and a
+    jp z, .zero
 
-    call turnLCDOn
-
-lock:
-    jr lock
-
-SECTION "strings", ROMX, Bank[1]
-
-Success:
-    ld de, SuccessStr
+    ld a, "O"
+    ld [bc], a
     ret
-
-Failure:
-    ld de, FailureStr
-    ret
-
-SuccessStr:
-    db "You... You survived!                         Nice!", 0
-FailureStr:
-    db "Your emu suxxx lol", 0
-
-ButtonStr:
-    db "Press a button!", 0
-
-SECTION "STAT IRQ vector", ROM0[$048]
-    ret
-
-SECTION "Timer IRQ vector", ROM0[$050]
-    ld d, $69
-    ret
-
-SECTION "Serial IRQ vector", ROM0[$058]
-    inc d
-    ret
-
-SECTION "Joypad IRQ vector", ROM0[$060]
-    ld d, $FE
-    ret
-
-SECTION "OAM info", ROM0[$3F00]
-    REPT $3F9F - $3F00
-        db 69
-    ENDR
-
-SECTION "DMA routine 1", ROM0[$3FA0] ; the DMA routine that checks if your DMA is instant
-    ld a, $3F ; set OAM source addr to 0x3F00
-    ld [$FF46], a
-    ld a, [hl]
-    cp a, $69
-    jp z, lock
-
-    ld a, $28
-
-oamDMADelay1:
-    dec a
-    jr nz, oamDMADelay1
+.zero:
+    ld a, "X"
+    ld [bc], a
     ret
 
 
-Section "DMA routine 2", ROM0[$3FC0] ; checks if you've implemented bus conflicts
-    ld hl, $C000
-    ld a, $3F ; set OAM source addr to 0x3F00
-    ld [hl], a
-    ld [$FF46], a
-    ld a, [hl]
-    cp a, $3F ; this should cause a bus conflict and make it read the value on the bus instead of $3F
-    push af
-    pop bc ; store current F register in C. We can't lock quite yet cause doing so would cause a bus conflict
+TestCount EQU 12
+TestTable:
+    dw round1  ; 0 - MEMORY
+    dw round2  ; 1 - MEMORY
+    dw round5  ; 2 - MEMORY
+    dw round10 ; 3 - MEMORY
+    dw round6  ; 4 - LCD
+    dw round7  ; 5 - LCD
+    dw round3  ; 6 - DMA
+    dw round9  ; 7 - DMA
+    dw round4  ; 8 - COM
+    dw round11 ; 9 - INTERRUPT
+    dw round12 ; A - INTERRUPT
+    dw round13 ; B - INTERRUPT
 
-    ld a, [rSCX] ; This is an MMIO address, so accessing it shouldn't cause a bus conflict
-    cp a, $FF 
-    ;jp nz, lock
-    push af
-    pop de  ; store current F register in E. We can't lock quite yet cause doing so would cause a bus conflict
+SymbolVramTable: 
+    dw $984B ; dw round1 ; MEMORY
+    dw $984C ; dw round2 ; MEMORY
+    dw $984D ; dw round5 ; MEMORY
+    dw $984E ; dw round10 ; MEMORY
+    dw $988B ; dw round6 ; LCD
+    dw $988C ; dw round7 ; LCD
+    dw $990B ; dw round3 ; DMA
+    dw $990C ; dw round9 ; DMA
+    dw $994B ; dw round4 ; COM
+    dw $99CB ; dw round11 ; INTERRUPT
+    dw $99CC ; dw round12 ; INTERRUPT
+    dw $98CB ; dw round13 ; TIMER
 
-    ld a, $28
+SECTION "font", ROMX
+Font: INCBIN "GB/CTF/ags-aging-font.chr"
 
-oamDMADelay2:
-    dec a
-    jr nz, oamDMADelay2
+SECTION "UIStrings", ROMX
+Test: db "DMG AGING CARTRIDGE",0
+TestListText:
+db " MEMORY....----\n"
+db "\n"
+db " LCD.......--\n"
+db "\n"
+db " TIMER.....-\n"
+db "\n"
+db " DMA.......--\n"
+db "\n"
+db " COM.......-\n"
+db "\n"
+db " KEY INPUT.\n"
+db "\n"
+db " INTERRUPT.--\n",0
+PushStartText: db "PUSH START TO GO",0
 
-    bit 7, c
-    jp nz, lock
+CHARMAP "→", $10
+PassText: db "→PASS",0
+FailText: db "→FAIL",0 
 
-    bit 7, e
-    jp z, lock
-    ret
+; $04,$05,$06: Start button 
+StartGoBackText: db $04,$05,$06," Go Back",0
+
+CreditsText: 
+CHARMAP "─", $1C
+CHARMAP "┤", $0B
+CHARMAP "├", $09
+CHARMAP "┌", $1E
+CHARMAP "└", $08
+CHARMAP "┐", $1F
+CHARMAP "┘", $07
+CHARMAP "│", $1D
+
+db " CONTACT US\n"
+db "┌──────────────┐\n"
+db "┤GUI Programmer├───────\n"
+db "└──────────────┘\n"
+db "Discord:\n" 
+db " MLGxPwnentz#1728\n"
+db "┌───────────┐\n"
+db "┤Test Writer├───────\n"
+db "└───────────┘\n"
+db "Discord:\n"
+db " guccirodakino#1457\n"
+db "Nintendo Switch:\n"
+db " SW-8356-6970-6111\n",0
+
+SECTION "wram", WRAM0
+AnimationTimer: db
+AnimationFrame: db
+CurrentTestNumber: db
+
+SECTION "hram", HRAM
+LastJoypad: db
+
