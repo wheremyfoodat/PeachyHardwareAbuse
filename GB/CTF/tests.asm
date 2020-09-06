@@ -323,20 +323,23 @@ round12:     ; EI/DI
 round13: ; MMIO_exec_1 by Peach
     di
 
+    ld c, 0
+
     ld [rDIV], a ; Reset DIV to initialize timer
 
     ld a, $C9
     ld [rTMA], a ; store opcode for RET into TMA
-    ld a, $39    
+    ld a, $09    
     ld [rTIMA], a
     ld a, %101
     ld [rTAC], a
 
-    xor a
-    call rTIMA ; TIMA should increment to 0x3C / inc a just in time.
+    nop
+    call rTIMA ; TIMA should increment to 0x0C / inc c just in time.
 
     ei
     
+    ld a, c
     cp a, $1
     jp Z, TestSuccess
     jp NZ, TestFailure
