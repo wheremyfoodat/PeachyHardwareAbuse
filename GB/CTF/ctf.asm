@@ -323,7 +323,7 @@ SetTestNumberSuccess:
     ret
 
 
-TestCount EQU 11
+TestCount EQU 12
 TestTable:
     dw round1  ; 0 - MEMORY
     dw round2  ; 1 - MEMORY
@@ -336,6 +336,7 @@ TestTable:
     dw round4  ; 8 - COM
     dw round11 ; 9 - INTERRUPT
     dw round12 ; A - INTERRUPT
+    dw round13 ; B - INTERRUPT
 
 SymbolVramTable: 
     dw $984B ; dw round1 ; MEMORY
@@ -349,6 +350,7 @@ SymbolVramTable:
     dw $994B ; dw round4 ; COM
     dw $99CB ; dw round11 ; INTERRUPT
     dw $99CC ; dw round12 ; INTERRUPT
+    dw $98CB ; dw round13 ; TIMER
 
 SECTION "font", ROMX
 Font: INCBIN "GB/CTF/ags-aging-font.chr"
@@ -360,7 +362,7 @@ db " MEMORY....----\n"
 db "\n"
 db " LCD.......--\n"
 db "\n"
-db " TIMER.....\n"
+db " TIMER.....-\n"
 db "\n"
 db " DMA.......--\n"
 db "\n"

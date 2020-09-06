@@ -320,8 +320,26 @@ round12:     ; EI/DI
 
     call turnLCDOn
 
-lock:
-    jr lock
+round13: ; MMIO_exec_1 by Peach
+    di
+
+    ld [rDIV], a ; Reset DIV to initialize timer
+
+    ld a, $C9
+    ld [rTMA], a ; store opcode for RET into TMA
+    ld a, $39    
+    ld [rTIMA], a
+    ld a, %101
+    ld [rTAC], a
+
+    xor a
+    call rTIMA ; TIMA should increment to 0x3C / inc a just in time.
+
+    ei
+    
+    cp a, $1
+    jp Z, TestSuccess
+    jp NZ, TestFailure
 
 SECTION "strings", ROMX, Bank[1]
 
