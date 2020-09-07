@@ -55,10 +55,10 @@ TestScreen:
     call turnLCDOff
 
     ld a, 30
-    ld [AnimationTimer], a
+    ld [wAnimationTimer], a
 
     ld a, 1
-    ld [AnimationFrame], a
+    ld [wAnimationFrame], a
 
     ; Erase tilemap
     ld bc, 1024
@@ -111,7 +111,7 @@ TestScreen:
     ld a, %00011011
     ld [rBGP], a
 
-    ld hl, AnimationTimer
+    ld hl, wAnimationTimer
     dec [hl]
     ld a, [hl]
 
@@ -122,7 +122,7 @@ TestScreen:
     ld a, 30
     ld [hl], a
 
-    ld hl, AnimationFrame
+    ld hl, wAnimationFrame
     ld a, [hl]
     xor a, 1 ; Toggle bit 0
     ld [hl], a
@@ -144,7 +144,7 @@ TestScreen:
     call Memset
 
 .continue:
-    ld a, [LastJoypad]
+    ld a, [hLastJoypad]
     ld c, a
     
     call PollJoypad
@@ -191,7 +191,7 @@ CreditsScreen:
     ld a, %00011011
     ld [rBGP], a
 
-    ld a, [LastJoypad]
+    ld a, [hLastJoypad]
     ld c, a
     
     call PollJoypad
@@ -235,26 +235,26 @@ PollJoypad:
     and $0F
     or a, b
 
-    ldh [LastJoypad], a
+    ldh [hLastJoypad], a
 
     ret
 
 RunTests:
     xor a
-    ld [CurrentTestNumber], a
+    ld [wCurrentTestNumber], a
 
 .nextTest:
-    ld a, [CurrentTestNumber]
+    ld a, [wCurrentTestNumber]
     ld c, a
     call DispatchTestNumber
     ; Test returns success value in a, back that up.
     ld d, a
-    ld a, [CurrentTestNumber]
+    ld a, [wCurrentTestNumber]
     ld c, a
     ld a, d
     call SetTestNumberSuccess
     
-    ld hl, CurrentTestNumber
+    ld hl, wCurrentTestNumber
     ld a, [hl]
     inc a
     ld [hl], a
@@ -405,10 +405,10 @@ db "Nintendo Switch:\n"
 db " SW-8356-6970-6111\n",0
 
 SECTION "wram", WRAM0
-AnimationTimer: db
-AnimationFrame: db
-CurrentTestNumber: db
+wAnimationTimer: db
+wAnimationFrame: db
+wCurrentTestNumber: db
 
 SECTION "hram", HRAM
-LastJoypad: db
+hLastJoypad: db
 

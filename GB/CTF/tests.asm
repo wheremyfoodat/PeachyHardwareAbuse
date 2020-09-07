@@ -36,7 +36,7 @@ round2:
 round3:               ; make sure DMA is not instant
     call turnLCDOff
 
-    ld hl, $FF80
+    ld hl, hOAMDMA
     ld bc, OAMDMARoutine1
 
 .copyOAMDMARoutine1:    
@@ -50,7 +50,7 @@ round3:               ; make sure DMA is not instant
     xor a
     ld [hl], a ; store 0 into last OAM byte
 
-    call $FF80 ; go to OAM handling routine
+    call hOAMDMA ; go to OAM handling routine
 
     push af
     call turnLCDOn
@@ -63,7 +63,7 @@ round3:               ; make sure DMA is not instant
 
 round4:           ; How is your serial port doing?
     ld a, [rIE]
-    ld [IEBackup], a
+    ld [wIEBackup], a
 
     xor a
     ld d, a
@@ -99,13 +99,13 @@ round4:           ; How is your serial port doing?
     jp z, .restoreIeAndFail
 
 .restoreIeAndSucceed
-    ld a, [IEBackup]
+    ld a, [wIEBackup]
     ld [rIE], a
 
     jp TestSuccess
 
 .restoreIeAndFail:
-    ld a, [IEBackup]
+    ld a, [wIEBackup]
     ld [rIE], a
 
     jp TestFailure
@@ -218,7 +218,7 @@ round9:          ; DMA bus conflicts!
     ld a, $FF ; Set NR11 to 255 for test 9
     ld [rNR11], a
 
-    ld hl, $FF80
+    ld hl, hOAMDMA
     ld bc, OAMDMARoutine2
 
 .copyOAMDMARoutine2:    
@@ -228,10 +228,10 @@ round9:          ; DMA bus conflicts!
     cp a, $C9
     jp nz, .copyOAMDMARoutine2
 
-    jp $FF80
+    jp hOAMDMA
 
 round10:      ; POP timing (PUSH timing is pretty much the same thing so I don't test it out of laziness)
-    ld [SPBackup], sp
+    ld [wSPBackup], sp
 
     ld sp, rDIV
     xor a
@@ -243,7 +243,7 @@ round10:      ; POP timing (PUSH timing is pretty much the same thing so I don't
 
     pop de
 
-    ld hl, SPBackup
+    ld hl, wSPBackup
     ld a, [hl+]
     ld c, a
     ld a, [hl+]
@@ -262,7 +262,7 @@ round10:      ; POP timing (PUSH timing is pretty much the same thing so I don't
 
 round11:     ; HALT bug
     ld a, [rIE]
-    ld [IEBackup], a
+    ld [wIEBackup], a
 
     di
     xor a
@@ -288,7 +288,7 @@ round11:     ; HALT bug
     inc a   ; this should trigger the halt bug. therefore this instruction should be executed twice
     cp a, %1000 
 
-    ld a, [IEBackup]
+    ld a, [wIEBackup]
     ld [rIE], a
 
     jp nz, TestFailure
@@ -371,8 +371,8 @@ ButtonStr:
     db "Press a button!", 0
 
 SECTION "SP Backup lol", WRAM0
-SPBackup: dw
-IEBackup: db
+wSPBackup: dw
+wIEBackup: db
 
 SECTION "Timer IRQ vector", ROM0[$050]
     ld d, $69
@@ -448,3 +448,6 @@ OAMDMARoutine2:
     ld a, c
 
     ret
+
+Section "OAM DMA Routine HRAM", HRAM[$FF80]
+hOAMDMA: db
